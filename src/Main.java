@@ -1,28 +1,53 @@
-import java.util.Scanner;
-import java.util.concurrent.*;
+import java.io.IOException;
 
 public class Main {
-	public static void main(String[] args) {
-		Scanner scanner = new Scanner(System.in);
-		ExecutorService executor = Executors.newSingleThreadExecutor();
+	// Собственное исключение TimeoutException
+	static class TimeoutException extends Exception {
+		public TimeoutException(String message) {
+			super(message);
+		}
+	}
+	
+	// Функция для ввода данных без использования Scanner
+	public static int readInput() throws IOException {
+		StringBuilder sb = new StringBuilder();
+		int ch;
+		while ((ch = System.in.read()) != '\n' && ch != -1) {
+			if (ch != '\r') { // Игнорируем возврат каретки
+				sb.append((char) ch);
+			}
+		}
 		
+		try {
+			return Integer.parseInt(sb.toString().trim());
+		} catch (NumberFormatException e) {
+			throw new IOException("Некорректный ввод");
+		}
+	}
+	
+	public static void main(String[] args) {
 		boolean validInput = false;
 		
 		while (!validInput) {
 			try {
 				System.out.println("Введите делитель (не равный нулю):");
 				
-				// Создаем задачу для получения ввода с таймером
-				Future<Integer> future = executor.submit(() -> {
-					return scanner.nextInt();
-				});
-				
-				// Ждем ввод максимум 30 секунд
+				// Ждем 30 секунд для ввода
+				long startTime = System.currentTimeMillis();
+				long timeoutInMillis = 30 * 1000;
 				int divisor = 0;
-				try {
-					divisor = future.get(30, TimeUnit.SECONDS);
-				} catch (TimeoutException e) {
-					future.cancel(true);
+				boolean inputReceived = false;
+				
+				// Проверяем доступность данных для чтения
+				while (!inputReceived && 
+					  (System.currentTimeMillis() - startTime) < timeoutInMillis) {
+					if (System.in.available() > 0) {
+						divisor = readInput();
+						inputReceived = true;
+					}
+				}
+				
+				if (!inputReceived) {
 					throw new TimeoutException("Время ожидания ввода истекло (30 секунд)");
 				}
 				
@@ -36,17 +61,14 @@ public class Main {
 			} catch (TimeoutException e) {
 				System.out.println(e.getMessage());
 				break; // Выходим из цикла при истечении времени
-			} catch (InterruptedException | ExecutionException e) {
-				System.out.println("Произошла ошибка при обработке ввода: " + e.getMessage());
-				break;
-			} catch (Exception e) {
+			} catch (IOException e) {
 				System.out.println("Некорректный ввод. Введите целое число. Попробуйте снова.");
-				scanner.nextLine(); // Очищаем буфер ввода
+			} catch (Exception e) {
+				System.out.println("Произошла ошибка: " + e.getMessage());
 			}
 		}
 		
-		executor.shutdownNow();
-		scanner.close();
 		System.out.println("Программа завершена.");
+		System.exit(0); // Завершаем программу
 	}
 }
